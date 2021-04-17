@@ -1,0 +1,7 @@
+domain: k8ops.cn
+repo: github.com/seanly/cluster-secret
+resources:
+- group: ops
+  kind: ClusterSecret
+  version: v1
+version: "2"
