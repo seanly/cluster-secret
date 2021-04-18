@@ -49,8 +49,6 @@ func (r *SecretReconciler) Reconcile(clusterSecret opsv1.ClusterSecret, ns strin
 		return nil
 	}
 
-	r.Log.Info(fmt.Sprintf("Getting SA for: %s", ns))
-
 	if clusterSecret.Spec.SecretRef == nil ||
 		clusterSecret.Spec.SecretRef.Name == "" ||
 		clusterSecret.Spec.SecretRef.Namespace == "" {
@@ -77,20 +75,10 @@ func (r *SecretReconciler) Reconcile(clusterSecret opsv1.ClusterSecret, ns strin
 	}
 
 	if seedSecret.Type == corev1.SecretTypeDockerConfigJson {
-
-		SAs, err := r.listWithin(ns)
+		err = r.appendSecretToSA(clusterSecret, ns, "default")
 		if err != nil {
-			wrappedErr := errors.Wrapf(err, "failed to list service accounts in %s namespace", ns)
-			r.Log.Info(wrappedErr.Error())
-			return wrappedErr
-		}
-
-		for _, sa := range SAs.Items {
-			err = r.appendSecretToSA(clusterSecret, ns, sa.Name)
-			if err != nil {
-				r.Log.Info(err.Error())
-				return err
-			}
+			r.Log.Info(err.Error())
+			return err
 		}
 	}
 
@@ -110,7 +98,7 @@ func (r *SecretReconciler) listWithin(ns string) (*corev1.ServiceAccountList, er
 func (r *SecretReconciler) createSecret(clusterSecret opsv1.ClusterSecret, seedSecret *corev1.Secret, ns string) error {
 	ctx := context.Background()
 
-	secretKey := clusterSecret.Name + "-" + clusterSecret.Spec.Suffix
+	secretKey := clusterSecret.Name
 
 	nsSecret := &corev1.Secret{}
 	err := r.Client.Get(ctx, client.ObjectKey{Name: secretKey, Namespace: ns}, nsSecret)
@@ -126,6 +114,9 @@ func (r *SecretReconciler) createSecret(clusterSecret opsv1.ClusterSecret, seedS
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretKey,
 				Namespace: ns,
+				Annotations: map[string]string{
+					"ops.k8ops.cn/cluster-secret": secretKey,
+				},
 			},
 			Data: seedSecret.Data,
 			Type: seedSecret.Type,
@@ -150,7 +141,7 @@ func (r *SecretReconciler) createSecret(clusterSecret opsv1.ClusterSecret, seedS
 func (r *SecretReconciler) appendSecretToSA(clusterSecret opsv1.ClusterSecret, ns, serviceAccountName string) error {
 	ctx := context.Background()
 
-	secretKey := clusterSecret.Name + "-" + clusterSecret.Spec.Suffix
+	secretKey := clusterSecret.Name
 
 	sa := &corev1.ServiceAccount{}
 	err := r.Client.Get(ctx, client.ObjectKey{Name: serviceAccountName, Namespace: ns}, sa)

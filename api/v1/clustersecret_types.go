@@ -26,7 +26,6 @@ import (
 // ClusterSecretSpec defines the desired state of ClusterSecret
 type ClusterSecretSpec struct {
 	SecretRef *metav1.ObjectMeta `json:"secretRef,omitempty"`
-	Suffix    string             `json:"suffix,omitempty"`
 }
 
 // ClusterSecretStatus defines the observed state of ClusterSecret

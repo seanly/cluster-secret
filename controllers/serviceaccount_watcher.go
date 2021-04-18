@@ -31,9 +31,13 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		r.Log.Info(fmt.Sprintf("%s", errors.Wrap(err, "unable to fetch serviceaccount")))
 		return ctrl.Result{}, nil
 	}
+	
+	if sa.Name != "default" {
+		return ctrl.Result{}, nil
+	}
 
 	r.Log.Info(fmt.Sprintf("detected a change in serviceaccount: %s", sa.Name))
-
+	
 	clusterSecretList := &opsv1.ClusterSecretList{}
 	err := r.Client.List(ctx, clusterSecretList)
 	if err != nil {
@@ -71,7 +75,11 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 func (r *ServiceAccountWatcher) appendSecretToSA(clusterSecret opsv1.ClusterSecret, ns, serviceAccountName string) error {
 	ctx := context.Background()
 
-	secretKey := clusterSecret.Name + "-" + clusterSecret.Spec.Suffix
+	if !clusterSecret.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	secretKey := clusterSecret.Name
 
 	sa := &corev1.ServiceAccount{}
 	err := r.Client.Get(ctx, client.ObjectKey{Name: serviceAccountName, Namespace: ns}, sa)
