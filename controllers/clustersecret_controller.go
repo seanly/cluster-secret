@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	opsv1 "github.com/seanly/cluster-secret/api/v1"
@@ -66,6 +67,39 @@ func (r *ClusterSecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	r.Log.Info(fmt.Sprintf("Found ClusterSecret: %s\n", clusterSecret.Name))
 
+	// 更新ClusterSecret资源
+	defer func() {
+		if err := r.Update(ctx, &clusterSecret); err != nil {
+			r.Log.Error(err, "patch failed")
+		}
+	}()
+
+	// 设置了 Finalizers 会导致 k8s 的 delete 动作转为设置 metadata.deletionTimestamp 字段
+	if !clusterSecret.ObjectMeta.DeletionTimestamp.IsZero() {
+		return r.reconcileDelete(&clusterSecret)
+	}
+	// 如果为0 ，则资源未被删除，我们需要检测是否存在 finalizer，如果不存在，则添加，并更新到资源对象中
+	return r.reconcileNormal(&clusterSecret)
+}
+
+func (r *ClusterSecretReconciler) reconcileDelete(clusterSecret *opsv1.ClusterSecret) (ctrl.Result, error) {
+	// 如果不为 0 ，则对象处于删除中
+	// 如果存在 finalizer 且与上述声明的 finalizer 匹配，那么执行对应 hook 逻辑
+	if err := r.deleteClusterSecretResources(clusterSecret); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// 如果对应 hook 执行成功，那么清空 finalizers， k8s 删除对应资源
+	ctrlutil.RemoveFinalizer(clusterSecret, opsv1.ClusterFinalizer)
+
+	return ctrl.Result{}, nil
+}
+
+func (r *ClusterSecretReconciler) reconcileNormal(clusterSecret *opsv1.ClusterSecret) (ctrl.Result, error) {
+
+	ctx := context.Background()
+	ctrlutil.AddFinalizer(clusterSecret, opsv1.ClusterFinalizer)
+
 	// 同步创建相关资源
 	namespaces := &corev1.NamespaceList{}
 	if err := r.Client.List(ctx, namespaces); err != nil {
@@ -76,52 +110,21 @@ func (r *ClusterSecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	for _, namespace := range namespaces.Items {
 		namespaceName := namespace.Name
-		err := r.SecretReconciler.Reconcile(clusterSecret, namespaceName)
+		err := r.SecretReconciler.Reconcile(*clusterSecret, namespaceName)
 		if err != nil {
 			r.Log.Info(fmt.Sprintf("Found error: %s", err.Error()))
 			return ctrl.Result{}, err
 		}
 	}
 
-	finalizerName := "finalizer.k8ops.cn"
-
-	// 设置了 Finalizers 会导致 k8s 的 delete 动作转为设置 metadata.deletionTimestamp 字段
-	if clusterSecret.ObjectMeta.DeletionTimestamp.IsZero() {
-		// 如果为0 ，则资源未被删除，我们需要检测是否存在 finalizer，如果不存在，则添加，并更新到资源对象中
-		if !containsString(clusterSecret.ObjectMeta.Finalizers, finalizerName) {
-			clusterSecret.ObjectMeta.Finalizers = append(clusterSecret.ObjectMeta.Finalizers, finalizerName)
-
-			if err := r.Update(ctx, &clusterSecret); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
-		// 如果不为 0 ，则对象处于删除中
-		if containsString(clusterSecret.ObjectMeta.Finalizers, finalizerName) {
-			// 如果存在 finalizer 且与上述声明的 finalizer 匹配，那么执行对应 hook 逻辑
-			if err := r.deleteClusterSecretResources(clusterSecret); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// 如果对应 hook 执行成功，那么清空 finalizers， k8s 删除对应资源
-			clusterSecret.ObjectMeta.Finalizers = removeString(clusterSecret.ObjectMeta.Finalizers, finalizerName)
-			if err := r.Update(ctx, &clusterSecret); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	}
-
 	return ctrl.Result{}, nil
-
 }
 
-func (r *ClusterSecretReconciler) deleteClusterSecretResources(clusterSecret opsv1.ClusterSecret) error {
+func (r *ClusterSecretReconciler) deleteClusterSecretResources(clusterSecret *opsv1.ClusterSecret) error {
 	//
 	// 删除 ClusterSecret关联的外部资源逻辑
 	//
-
 	ctx := context.Background()
-
 	namespaces := &corev1.NamespaceList{}
 	if err := r.Client.List(ctx, namespaces); err != nil {
 		r.Log.Info(fmt.Sprintf("%s\n", errors.Wrap(err, "unable to fetch namespaces")))
@@ -141,7 +144,7 @@ func (r *ClusterSecretReconciler) deleteClusterSecretResources(clusterSecret ops
 	return nil
 }
 
-func (r *ClusterSecretReconciler) deleteClusterSecret(clusterSecret opsv1.ClusterSecret, ns string) error {
+func (r *ClusterSecretReconciler) deleteClusterSecret(clusterSecret *opsv1.ClusterSecret, ns string) error {
 
 	ctx := context.Background()
 
@@ -211,25 +214,6 @@ func (r *ClusterSecretReconciler) cleanPullSecretInSA(secret corev1.Secret, ns s
 	}
 
 	return nil
-}
-
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) (result []string) {
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return
 }
 
 func (r *ClusterSecretReconciler) SetupWithManager(mgr ctrl.Manager) error {

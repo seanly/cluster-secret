@@ -47,6 +47,10 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 
 	for _, clusterSecret := range clusterSecretList.Items {
 
+		if !clusterSecret.DeletionTimestamp.IsZero() {
+			break
+		}
+
 		seedSecret := &corev1.Secret{}
 		if err := r.Get(ctx,
 			client.ObjectKey{
@@ -65,7 +69,6 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 				r.Log.Info(err.Error())
 				return ctrl.Result{}, nil
 			}
-
 		}
 	}
 
