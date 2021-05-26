@@ -24,13 +24,13 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-
 	ClusterFinalizer = "finalizer.k8ops.cn"
 )
 
 // ClusterSecretSpec defines the desired state of ClusterSecret
 type ClusterSecretSpec struct {
-	SecretRef *metav1.ObjectMeta `json:"secretRef,omitempty"`
+	SecretRef  *metav1.ObjectMeta `json:"secretRef"`
+	Namespaces []string           `json:"namespaces,omitempty"`
 }
 
 // ClusterSecretStatus defines the observed state of ClusterSecret

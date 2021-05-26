@@ -6,6 +6,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	opsv1 "github.com/seanly/cluster-secret/api/v1"
+	"github.com/seanly/cluster-secret/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,13 +32,13 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		r.Log.Info(fmt.Sprintf("%s", errors.Wrap(err, "unable to fetch serviceaccount")))
 		return ctrl.Result{}, nil
 	}
-	
+
 	if sa.Name != "default" {
 		return ctrl.Result{}, nil
 	}
 
 	r.Log.Info(fmt.Sprintf("detected a change in serviceaccount: %s", sa.Name))
-	
+
 	clusterSecretList := &opsv1.ClusterSecretList{}
 	err := r.Client.List(ctx, clusterSecretList)
 	if err != nil {
@@ -49,6 +50,12 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 
 		if !clusterSecret.DeletionTimestamp.IsZero() {
 			break
+		}
+
+		if len(clusterSecret.Spec.Namespaces) > 0 {
+			if _, exist := util.Find(clusterSecret.Spec.Namespaces, sa.Namespace); !exist {
+				break
+			}
 		}
 
 		seedSecret := &corev1.Secret{}
@@ -63,7 +70,6 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 
 		if seedSecret.Type == corev1.SecretTypeDockerConfigJson {
-
 			err = r.appendSecretToSA(clusterSecret, sa.Namespace, sa.Name)
 			if err != nil {
 				r.Log.Info(err.Error())

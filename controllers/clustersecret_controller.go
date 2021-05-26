@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/seanly/cluster-secret/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	opsv1 "github.com/seanly/cluster-secret/api/v1"
 )
@@ -129,7 +130,6 @@ func (r *ClusterSecretReconciler) deleteClusterSecretResources(clusterSecret *op
 	if err := r.Client.List(ctx, namespaces); err != nil {
 		r.Log.Info(fmt.Sprintf("%s\n", errors.Wrap(err, "unable to fetch namespaces")))
 	}
-
 	r.Log.Info(fmt.Sprintf("Found %d namespaces", len(namespaces.Items)))
 
 	for _, namespace := range namespaces.Items {
@@ -154,6 +154,12 @@ func (r *ClusterSecretReconciler) deleteClusterSecret(clusterSecret *opsv1.Clust
 		wrappedErr := errors.Wrapf(err, "unable to fetch namespace: %s", ns)
 		r.Log.Info(wrappedErr.Error())
 		return wrappedErr
+	}
+
+	if len(clusterSecret.Spec.Namespaces) > 0 {
+		if _, exist := util.Find(clusterSecret.Spec.Namespaces, targetNS.Name); !exist {
+			return nil
+		}
 	}
 
 	if ignoredNamespace(targetNS) {

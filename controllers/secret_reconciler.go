@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	opsv1 "github.com/seanly/cluster-secret/api/v1"
+	"github.com/seanly/cluster-secret/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,6 +43,12 @@ func (r *SecretReconciler) Reconcile(clusterSecret opsv1.ClusterSecret, ns strin
 		wrappedErr := errors.Wrapf(err, "unable to fetch namespace: %s", ns)
 		r.Log.Info(wrappedErr.Error())
 		return wrappedErr
+	}
+
+	if len(clusterSecret.Spec.Namespaces) > 0 {
+		if _, exist := util.Find(clusterSecret.Spec.Namespaces, targetNS.Name); !exist {
+			return nil
+		}
 	}
 
 	if ignoredNamespace(targetNS) {

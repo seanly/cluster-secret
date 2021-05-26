@@ -47,6 +47,7 @@ func (r *NamespaceWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if !clusterSecret.DeletionTimestamp.IsZero() {
 			break
 		}
+
 		err := r.SecretReconciler.Reconcile(clusterSecret, namespace.Name)
 		if err != nil {
 			r.Log.Info(fmt.Sprintf("error reconciling namespace: %s with cluster pull secret: %s, error: %s",

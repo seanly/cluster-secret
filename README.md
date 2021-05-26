@@ -13,8 +13,10 @@ kind: ClusterSecret
 metadata:
     name: docker-registry-jcr
 spec:
-secretRef:
-  name: seed-docker-registry-jcr
-  namespace: kubebuilder-demo
+    secretRef:
+      name: seed-docker-registry-jcr
+      namespace: kubebuilder-demo
+    namespaces:
+      - default
 ```
 使用注意clusterSecert的name不能和secretRef的name相同
