@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-	"github.com/seanly/cluster-secret/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -157,7 +156,7 @@ func (r *ClusterSecretReconciler) deleteClusterSecret(clusterSecret *opsv1.Clust
 	}
 
 	if len(clusterSecret.Spec.Namespaces) > 0 {
-		if _, exist := util.Find(clusterSecret.Spec.Namespaces, targetNS.Name); !exist {
+		if _, exist := Find(clusterSecret.Spec.Namespaces, targetNS.Name); !exist {
 			return nil
 		}
 	}

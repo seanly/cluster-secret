@@ -1,4 +1,4 @@
-package util
+package controllers
 
 // Find takes a slice and looks for an element in it. If found it will
 // return it's key, otherwise it will return -1 and a bool of false.

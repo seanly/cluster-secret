@@ -6,7 +6,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	opsv1 "github.com/seanly/cluster-secret/api/v1"
-	"github.com/seanly/cluster-secret/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,7 +52,7 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 
 		if len(clusterSecret.Spec.Namespaces) > 0 {
-			if _, exist := util.Find(clusterSecret.Spec.Namespaces, sa.Namespace); !exist {
+			if _, exist := Find(clusterSecret.Spec.Namespaces, sa.Namespace); !exist {
 				break
 			}
 		}
