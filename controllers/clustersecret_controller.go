@@ -110,7 +110,7 @@ func (r *ClusterSecretReconciler) reconcileNormal(clusterSecret *opsv1.ClusterSe
 
 	for _, namespace := range namespaces.Items {
 		namespaceName := namespace.Name
-		err := r.SecretReconciler.Reconcile(*clusterSecret, namespaceName)
+		err := r.SecretReconciler.Reconcile2(*clusterSecret, namespaceName)
 		if err != nil {
 			r.Log.Info(fmt.Sprintf("Found error: %s", err.Error()))
 			return ctrl.Result{}, err

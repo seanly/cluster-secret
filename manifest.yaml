@@ -297,13 +297,14 @@ spec:
         - --enable-leader-election
         command:
         - /manager
-        image: registry.cn-hangzhou.aliyuncs.com/k8ops/cluster-secret:v1.0
+        image: registry.cn-hangzhou.aliyuncs.com/k8ops/cluster-secret:v1.1
+        imagePullPolicy: Always
         name: manager
         resources:
           limits:
-            cpu: 100m
-            memory: 30Mi
+            cpu: 500m
+            memory: 512Mi
           requests:
-            cpu: 100m
-            memory: 20Mi
+            cpu: 200m
+            memory: 200Mi
       terminationGracePeriodSeconds: 10

@@ -34,7 +34,54 @@ func ignoredNamespace(ns *corev1.Namespace) bool {
 
 // Reconcile applies a number of ClusterPullSecrets to ServiceAccounts within
 // various valid namespaces. Namespaces can be ignored as required.
-func (r *SecretReconciler) Reconcile(clusterSecret opsv1.ClusterSecret, ns string) error {
+
+func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	ctx := context.Background()
+	r.Log.WithValues("namespace", req.NamespacedName)
+
+	var secret corev1.Secret
+	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
+		r.Log.Info(fmt.Sprintf("%s", errors.Wrap(err, "unable to fetch secret")))
+		return ctrl.Result{}, nil
+	}
+
+	clusterSecretList := &opsv1.ClusterSecretList{}
+	err := r.Client.List(ctx, clusterSecretList)
+	if err != nil {
+		r.Log.Info(fmt.Sprintf("unable to list ClusterPullSecrets, %s", err.Error()))
+		return ctrl.Result{}, nil
+	}
+
+	namespaces := &corev1.NamespaceList{}
+	if err := r.Client.List(ctx, namespaces); err != nil {
+		r.Log.Info(fmt.Sprintf("%s\n", errors.Wrap(err, "unable to fetch namespaces")))
+	}
+
+	r.Log.Info(fmt.Sprintf("Found %d namespaces", len(namespaces.Items)))
+
+	for _, clusterSecret := range clusterSecretList.Items {
+
+		if !clusterSecret.DeletionTimestamp.IsZero() {
+			break
+		}
+		if clusterSecret.Spec.SecretRef.Namespace == secret.Namespace &&
+			clusterSecret.Spec.SecretRef.Name == secret.Name {
+
+			for _, namespace := range namespaces.Items {
+				namespaceName := namespace.Name
+				err := r.Reconcile2(clusterSecret, namespaceName)
+				if err != nil {
+					r.Log.Info(fmt.Sprintf("Found error: %s", err.Error()))
+					return ctrl.Result{}, err
+				}
+			}
+		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *SecretReconciler) Reconcile2(clusterSecret opsv1.ClusterSecret, ns string) error {
 	ctx := context.Background()
 
 	targetNS := &corev1.Namespace{}
@@ -108,37 +155,45 @@ func (r *SecretReconciler) createSecret(clusterSecret opsv1.ClusterSecret, seedS
 
 	nsSecret := &corev1.Secret{}
 	err := r.Client.Get(ctx, client.ObjectKey{Name: secretKey, Namespace: ns}, nsSecret)
+
+	nsSecret = &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretKey,
+			Namespace: ns,
+			Annotations: map[string]string{
+				"ops.k8ops.cn/cluster-secret": secretKey,
+			},
+		},
+		Data: seedSecret.Data,
+		Type: seedSecret.Type,
+	}
+
 	if err != nil {
 		notFound := apierrors.IsNotFound(err)
-		if !notFound {
-			return errors.Wrap(err, "unexpected error checking for the namespaced pull secret")
+		if notFound {
+			err = ctrl.SetControllerReference(&clusterSecret, nsSecret, r.Scheme)
+			if err != nil {
+				r.Log.Info(fmt.Sprintf("can't create owner reference: %s.%s, %s", secretKey, ns, err.Error()))
+			}
+			err = r.Client.Create(ctx, nsSecret)
+			if err != nil {
+				r.Log.Info(fmt.Sprintf("can't create secret: %s.%s, %s", secretKey, ns, err.Error()))
+				return err
+			}
+			r.Log.Info(fmt.Sprintf("created secret: %s.%s", secretKey, ns))
 		}
-
-		r.Log.Info(fmt.Sprintf("secret not found: %s.%s, %s", secretKey, ns, err.Error()))
-
-		nsSecret = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      secretKey,
-				Namespace: ns,
-				Annotations: map[string]string{
-					"ops.k8ops.cn/cluster-secret": secretKey,
-				},
-			},
-			Data: seedSecret.Data,
-			Type: seedSecret.Type,
-		}
-
+	} else {
 		err = ctrl.SetControllerReference(&clusterSecret, nsSecret, r.Scheme)
 		if err != nil {
 			r.Log.Info(fmt.Sprintf("can't create owner reference: %s.%s, %s", secretKey, ns, err.Error()))
 		}
 
-		err = r.Client.Create(ctx, nsSecret)
+		err = r.Client.Update(ctx, nsSecret)
 		if err != nil {
-			r.Log.Info(fmt.Sprintf("can't create secret: %s.%s, %s", secretKey, ns, err.Error()))
+			r.Log.Info(fmt.Sprintf("can't update secret: %s.%s, %s", secretKey, ns, err.Error()))
 			return err
 		}
-		r.Log.Info(fmt.Sprintf("created secret: %s.%s", secretKey, ns))
+		r.Log.Info(fmt.Sprintf("update secret: %s.%s", secretKey, ns))
 	}
 
 	return nil
@@ -189,4 +244,10 @@ func hasImagePullSecret(sa *corev1.ServiceAccount, secretKey string) bool {
 		}
 	}
 	return found
+}
+
+func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Secret{}).
+		Complete(r)
 }
