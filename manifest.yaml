@@ -297,7 +297,7 @@ spec:
         - --enable-leader-election
         command:
         - /manager
-        image: registry.cn-hangzhou.aliyuncs.com/k8ops/cluster-secret:v1.1
+        image: registry.cn-hangzhou.aliyuncs.com/k8ops/cluster-secret:v1.2
         imagePullPolicy: Always
         name: manager
         resources:

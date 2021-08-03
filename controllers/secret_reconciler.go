@@ -42,12 +42,27 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	var secret corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
 		r.Log.Info(fmt.Sprintf("%s", errors.Wrap(err, "unable to fetch secret")))
+
+		if apierrors.IsNotFound(err) {
+			var clusterSecret opsv1.ClusterSecret
+			if err := r.Get(ctx, client.ObjectKey{Name: req.Name}, &clusterSecret); err != nil {
+				r.Log.Info(fmt.Sprintf("%s\n", errors.Wrap(err, "unable to fetch clusterSecret")))
+				return ctrl.Result{}, client.IgnoreNotFound(err)
+			}
+			return ctrl.Result{}, r.Reconcile2(clusterSecret, req.Namespace)
+		} else {
+			return ctrl.Result{}, nil
+		}
+	}
+
+	if secret.Type != corev1.SecretTypeDockerConfigJson &&
+		secret.Type != corev1.SecretTypeTLS {
 		return ctrl.Result{}, nil
 	}
 
 	clusterSecretList := &opsv1.ClusterSecretList{}
-	err := r.Client.List(ctx, clusterSecretList)
-	if err != nil {
+
+	if err := r.Client.List(ctx, clusterSecretList); err != nil {
 		r.Log.Info(fmt.Sprintf("unable to list ClusterPullSecrets, %s", err.Error()))
 		return ctrl.Result{}, nil
 	}
@@ -64,6 +79,7 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		if !clusterSecret.DeletionTimestamp.IsZero() {
 			break
 		}
+
 		if clusterSecret.Spec.SecretRef.Namespace == secret.Namespace &&
 			clusterSecret.Spec.SecretRef.Name == secret.Name {
 
@@ -76,6 +92,7 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 				}
 			}
 		}
+
 	}
 
 	return ctrl.Result{}, nil
