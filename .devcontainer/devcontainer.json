@@ -1,0 +1,50 @@
+{ //https://github.com/microsoft/vscode-dev-containers/blob/main/containers/codespaces-linux/.devcontainer/devcontainer.json
+    "name": "Opsbox Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            "VARIANT": "2-linux"
+        }
+    },
+    
+	"remoteUser": "codespace",
+
+	"overrideCommand": false,
+
+	"mounts": ["source=codespaces-linux-var-lib-docker,target=/var/lib/docker,type=volume"],
+
+	"runArgs": [
+		"--cap-add=SYS_PTRACE",
+		"--security-opt",
+		"seccomp=unconfined",
+		"--privileged",
+		"--init"
+	],
+    
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker",
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "formulahendry.code-runner",
+                "Gruntfuggly.todo-tree",
+                "DavidAnson.vscode-markdownlint",
+                "inercia.vscode-k3d"
+            ],
+            "settings": {
+                "terminal.integrated.profiles.linux": {
+                    "zsh (login)": {
+                        "path": "/usr/bin/zsh"
+                    }
+                }
+            }
+        }
+    },
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+    "onCreateCommand": "/bin/bash ./.devcontainer/on-create.sh",
+    "postCreateCommand": "/bin/bash ./.devcontainer/post-create.sh",
+    "postStartCommand": "/bin/bash ./.devcontainer/post-start.sh"
+}
