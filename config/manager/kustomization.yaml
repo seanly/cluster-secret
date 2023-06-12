@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: registry.cn-hangzhou.aliyuncs.com/k8ops/cluster-secret
-  newTag: v1.1
+  newName: seanly/cluster-secret
+  newTag: v2.0

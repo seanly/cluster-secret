@@ -1,8 +1,8 @@
 # Build the manager binary
-FROM registry.cn-hangzhou.aliyuncs.com/k8ops/golang:1.13 as builder
+FROM golang:1.20 as builder
 
 ENV GO111MODULE=on
-ENV GOPROXY=https://goproxy.cn/,direct
+#ENV GOPROXY=https://goproxy.cn/,direct
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
