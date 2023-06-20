@@ -26,10 +26,20 @@ import (
 const (
 	ClusterFinalizer = "finalizer.k8ops.cn"
 )
+// ObjectMeta contains enough information to locate the referenced Kubernetes resource object in any
+// namespace.
+type ObjectMeta struct {
+	// Name of the referent.
+	// +required
+	Name string `json:"name"`
 
+	// Namespace of the referent, when not specified it acts as LocalObjectReference.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
 // ClusterSecretSpec defines the desired state of ClusterSecret
 type ClusterSecretSpec struct {
-	SecretRef  *metav1.ObjectMeta `json:"secretRef"`
+	SecretRef  *ObjectMeta `json:"secretRef"`
 	Namespaces []string           `json:"namespaces,omitempty"`
 }
 
