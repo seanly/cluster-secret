@@ -12,3 +12,4 @@ spec:
       - name: manager
         args:
         - "--enable-leader-election"
+        - "--exclude-namespaces=kube-system,kube-public,kube-node-lease,u-*,p-*"

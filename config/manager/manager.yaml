@@ -27,6 +27,7 @@ spec:
         - /manager
         args:
         - --enable-leader-election
+        - --exclude-namespaces=kube-system,kube-public,kube-node-lease,u-*,p-*
         image: controller:latest
         imagePullPolicy: Always
         name: manager

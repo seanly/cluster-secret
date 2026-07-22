@@ -24,12 +24,25 @@ type SecretReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	Config *OperatorConfig
 }
 
 const ignoreAnnotation = "k8ops.cn/cluster-secret.ignore"
 
 func ignoredNamespace(ns *corev1.Namespace) bool {
 	return ns.Annotations[ignoreAnnotation] == "1" || strings.ToLower(ns.Annotations[ignoreAnnotation]) == "true"
+}
+
+func shouldSkipNamespace(ns *corev1.Namespace, cfg *OperatorConfig) (bool, string) {
+	if cfg != nil && cfg.isGloballyExcluded(ns.Name) {
+		return true, "global exclude list"
+	}
+
+	if ignoredNamespace(ns) {
+		return true, ignoreAnnotation
+	}
+
+	return false, ""
 }
 
 // Reconcile applies a number of ClusterPullSecrets to ServiceAccounts within
@@ -114,8 +127,8 @@ func (r *SecretReconciler) Reconcile2(clusterSecret opsv1.ClusterSecret, ns stri
 		}
 	}
 
-	if ignoredNamespace(targetNS) {
-		r.Log.Info(fmt.Sprintf("ignoring namespace %s due to annotation: %s ", ns, ignoreAnnotation))
+	if skip, reason := shouldSkipNamespace(targetNS, r.Config); skip {
+		r.Log.Info(fmt.Sprintf("ignoring namespace %s due to %s", ns, reason))
 		return nil
 	}
 

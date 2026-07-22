@@ -161,8 +161,8 @@ func (r *ClusterSecretReconciler) deleteClusterSecret(clusterSecret *opsv1.Clust
 		}
 	}
 
-	if ignoredNamespace(targetNS) {
-		r.Log.Info(fmt.Sprintf("ignoring namespace %s due to annotation: %s ", ns, ignoreAnnotation))
+	if skip, reason := shouldSkipNamespace(targetNS, r.SecretReconciler.Config); skip {
+		r.Log.Info(fmt.Sprintf("ignoring namespace %s due to %s", ns, reason))
 		return nil
 	}
 

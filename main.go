@@ -46,11 +46,16 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var excludeNamespaces string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&excludeNamespaces, "exclude-namespaces", "",
+		"Comma-separated list of namespaces to exclude from secret propagation. Supports globs, e.g. u-*,p-*.")
 	flag.Parse()
+
+	operatorConfig := controllers.NewOperatorConfig(excludeNamespaces)
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
@@ -70,6 +75,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ClusterSecret"),
 		Scheme: mgr.GetScheme(),
+		Config: operatorConfig,
 	}
 
 	if err = secretReconciler.SetupWithManager(mgr); err != nil {
@@ -101,6 +107,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("ServiceAccount"),
 		Scheme: mgr.GetScheme(),
+		Config: operatorConfig,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceAccount")
 		os.Exit(1)

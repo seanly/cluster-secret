@@ -300,9 +300,10 @@ spec:
       containers:
       - args:
         - --enable-leader-election
+        - --exclude-namespaces=kube-system,kube-public,kube-node-lease,u-*,p-*
         command:
         - /manager
-        image: seanly/cluster-secret:v2.0
+        image: registry.cn-chengdu.aliyuncs.com/seanly/appset:cluster-secret-v3.0.1-1
         imagePullPolicy: Always
         name: manager
         resources:

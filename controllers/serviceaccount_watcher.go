@@ -17,6 +17,7 @@ type ServiceAccountWatcher struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+	Config *OperatorConfig
 }
 
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
@@ -33,6 +34,17 @@ func (r *ServiceAccountWatcher) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	}
 
 	if sa.Name != "default" {
+		return ctrl.Result{}, nil
+	}
+
+	targetNS := &corev1.Namespace{}
+	if err := r.Get(ctx, client.ObjectKey{Name: sa.Namespace}, targetNS); err != nil {
+		r.Log.Info(fmt.Sprintf("%s", errors.Wrap(err, "unable to fetch namespace")))
+		return ctrl.Result{}, nil
+	}
+
+	if skip, reason := shouldSkipNamespace(targetNS, r.Config); skip {
+		r.Log.Info(fmt.Sprintf("ignoring namespace %s due to %s", sa.Namespace, reason))
 		return ctrl.Result{}, nil
 	}
 
